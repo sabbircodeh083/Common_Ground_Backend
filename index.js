@@ -27,6 +27,24 @@ app.get("/", (req, res) => {
   });
 });
 
+// Add a new event
+app.post("/add-event", async (req, res) => {
+  try {
+    const newEvent = req.body;
+    const result = await eventCollection.insertOne(newEvent);
+
+    res.status(201).json({
+      message: "Event added successfully.",
+    });
+  } catch (error) {
+    console.error("Error adding event:", error);
+
+    res.status(500).json({
+      message: "Failed to add event.",
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
