@@ -20,6 +20,14 @@ const db = client.db("CommonGround");
 //create collections
 const eventCollection = db.collection("events");
 const userCollection = db.collection("user");
+const joinedEventCollection = db.collection("joinedEvent");
+
+//create indext
+// Create unique index once during server startup
+await joinedEventCollection.createIndex(
+  { eventId: 1, participantId: 1 },
+  { unique: true },
+);
 
 // Better Auth stores users in the `user` collection. Its `_id` is either the
 // hex string id or an ObjectId depending on the adapter's id generation.
@@ -30,7 +38,7 @@ async function findOrganizer(organizerId) {
     const organizerData = await userCollection.findOne({ _id: organizerId });
     return organizerData;
   } catch (error) {
-    console.log("error at the time to fetch organizer", err);
+    console.log("error at the time to fetch organizer", error);
     return null;
   }
 }
@@ -85,9 +93,13 @@ app.get("/events", async (req, res) => {
 //fetch 6 upcoming events
 app.get("/events-recent6", async (req, res) => {
   try {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+    }).format(new Date());
+
     const events = await eventCollection
-      .find()
-      .sort({ date: -1 })
+      .find({ date: { $gte: today } })
+      .sort({ date: 1 })
       .limit(6)
       .toArray();
 
@@ -126,6 +138,124 @@ app.get("/events/:id", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to fetch events.",
+    });
+  }
+});
+
+//add a joined to a event
+app.post("/joinedEvent", async (req, res) => {
+  try {
+    const {
+      eventId: id,
+      participantId,
+      participantName,
+      participantEmail,
+    } = req.body;
+
+    if (!id || !participantId) {
+      return res.status(400).json({
+        message: "Event id and participant id are required.",
+      });
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid event id.",
+      });
+    }
+
+    const eventId = new ObjectId(id);
+
+    // 1. Find the event
+    const event = await eventCollection.findOne({
+      _id: eventId,
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        message: "Event not found.",
+      });
+    }
+
+    // 2. Check whether the participant already joined
+    const alreadyJoined = await joinedEventCollection.findOne({
+      eventId,
+      participantId,
+    });
+
+    if (alreadyJoined) {
+      return res.status(409).json({
+        code: "ALREADY_JOINED",
+        message: "You have already joined this event.",
+      });
+    }
+
+    // 3. Check volunteer capacity
+    const volunteerCount = event.volunteerCount || 0;
+
+    if (volunteerCount >= event.numberOfVolunteers) {
+      return res.status(409).json({
+        code: "EVENT_FULL",
+        message: "Sorry, this event has reached its volunteer limit.",
+      });
+    }
+
+    // 4. Reserve a slot atomically so concurrent joins cannot overbook
+    const updatedEvent = await eventCollection.findOneAndUpdate(
+      {
+        _id: eventId,
+        $expr: {
+          $lt: [{ $ifNull: ["$volunteerCount", 0] }, "$numberOfVolunteers"],
+        },
+      },
+      { $inc: { volunteerCount: 1 } },
+      { returnDocument: "after" },
+    );
+
+    if (!updatedEvent) {
+      return res.status(409).json({
+        code: "EVENT_FULL",
+        message: "Sorry, this event has reached its volunteer limit.",
+      });
+    }
+
+    // 5. Insert participant information, releasing the reserved slot on failure
+    const newJoinedEvent = {
+      ...req.body,
+      eventId,
+      participantId,
+      participantName,
+      participantEmail,
+      joinedAt: new Date(),
+    };
+
+    try {
+      await joinedEventCollection.insertOne(newJoinedEvent);
+    } catch (error) {
+      await eventCollection.updateOne(
+        { _id: eventId },
+        { $inc: { volunteerCount: -1 } },
+      );
+      throw error;
+    }
+
+    // 6. Success response
+    res.status(201).json({
+      message: "Joined event successfully.",
+      volunteerCount: updatedEvent.volunteerCount,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        code: "ALREADY_JOINED",
+        message: "You have already joined this event.",
+      });
+    }
+
+    console.error("Error joining event:", error);
+
+    res.status(500).json({
+      message: "Failed to join event.",
     });
   }
 });
