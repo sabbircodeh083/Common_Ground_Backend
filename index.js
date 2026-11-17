@@ -28,7 +28,7 @@ app.get("/", (req, res) => {
 });
 
 // Add a new event
-app.post("/add-event", async (req, res) => {
+app.post("/events", async (req, res) => {
   try {
     const newEvent = req.body;
     const result = await eventCollection.insertOne(newEvent);
@@ -41,6 +41,47 @@ app.post("/add-event", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to add event.",
+    });
+  }
+});
+
+// Fetch all events, soonest first
+app.get("/events", async (req, res) => {
+  try {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+    }).format(new Date());
+
+    const events = await eventCollection
+      .find({ date: { $gte: today } })
+      .sort({ date: 1 })
+      .toArray();
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error("Error fetching events:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch events.",
+    });
+  }
+});
+
+//fetch 6 upcoming events
+app.get("/events-recent6", async (req, res) => {
+  try {
+    const events = await eventCollection
+      .find()
+      .sort({ date: -1 })
+      .limit(6)
+      .toArray();
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error("Error fetching recent events:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch recent events.",
     });
   }
 });
