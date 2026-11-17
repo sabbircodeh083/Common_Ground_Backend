@@ -142,6 +142,80 @@ app.get("/events/:id", async (req, res) => {
   }
 });
 
+//update a event
+app.put("/events/:id", async (req, res) => {
+  try {
+    const Id = req.params.id;
+
+    if (!ObjectId.isValid(Id)) {
+      return res.status(400).json({
+        message: "Invalid event id.",
+      });
+    }
+
+    // Never let the client overwrite the id or the live volunteer count.
+    const { _id, volunteerCount, ...updates } = req.body;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        message: "No event fields to update.",
+      });
+    }
+
+    const result = await eventCollection.updateOne(
+      { _id: new ObjectId(Id) },
+      { $set: updates },
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        message: "Event not found.",
+      });
+    } else {
+      await joinedEventCollection.updateMany(
+        { eventId: new ObjectId(Id) },
+        { $set: updates },
+      );
+    }
+
+    return res.status(200).json({
+      message: "Event updated successfully.",
+    });
+  } catch (err) {
+    console.log("error for event update", err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+});
+
+//delete a event
+app.delete("/events/:id", async (req, res) => {
+  try {
+    const Id = req.params.id;
+
+    if (!ObjectId.isValid(Id)) {
+      return res.status(400).json({
+        message: "Invalid event id.",
+      });
+    }
+    const result = await eventCollection.deleteOne({ _id: new ObjectId(Id) });
+
+    if (result.deletedCount >= 1) {
+      await joinedEventCollection.deleteMany({ eventId: new ObjectId(Id) });
+    }
+
+    return res.status(200).json({
+      message: "Event deleted successfully.",
+    });
+  } catch (err) {
+    console.log("error for event deletion");
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+});
+
 //add a joined to a event
 app.post("/joinedEvent", async (req, res) => {
   try {
