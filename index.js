@@ -295,7 +295,6 @@ app.post("/joinedEvent", async (req, res) => {
 
     // 5. Insert participant information, releasing the reserved slot on failure
     const newJoinedEvent = {
-      ...req.body,
       eventId,
       participantId,
       participantName,
@@ -330,6 +329,31 @@ app.post("/joinedEvent", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to join event.",
+    });
+  }
+});
+
+//get joined events for a participant
+app.post("/joinedEvent/list", async (req, res) => {
+  try {
+    const { participantId } = req.body;
+
+    if (!participantId) {
+      return res.status(400).json({
+        message: "Participant id is required.",
+      });
+    }
+
+    const joinedEvents = await joinedEventCollection
+      .find({ participantId })
+      .toArray();
+
+    res.status(200).json(joinedEvents);
+  } catch (error) {
+    console.error("Error fetching joined events:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch joined events.",
     });
   }
 });
