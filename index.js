@@ -397,6 +397,29 @@ app.delete("/joinedEvent/:id", async (req, res) => {
   }
 });
 
+//get organized events for a organizer
+app.get("/joinedEvent/list/:organizerId", async (req, res) => {
+  try {
+    const { organizerId } = req.params;
+
+    if (!organizerId) {
+      return res.status(400).json({
+        message: "Participant id is required.",
+      });
+    }
+
+    const events = await eventCollection.find({ organizerId }).toArray();
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error("Error fetching joined events:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch joined events.",
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
