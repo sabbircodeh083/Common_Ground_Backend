@@ -201,8 +201,10 @@ app.delete("/events/:id", async (req, res) => {
     }
     const result = await eventCollection.deleteOne({ _id: new ObjectId(Id) });
 
-    if (result.deletedCount >= 1) {
-      await joinedEventCollection.deleteMany({ eventId: new ObjectId(Id) });
+    if (result.deletedCount === 1) {
+      await joinedEventCollection.deleteMany({
+        eventId: Id,
+      });
     }
 
     return res.status(200).json({
