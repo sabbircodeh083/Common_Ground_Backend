@@ -340,6 +340,7 @@ app.get("/joinedEvent/list/:participantId", async (req, res) => {
 
     const joinedEvents = await joinedEventCollection
       .find({ participantId })
+      .sort({ date: -1 })
       .toArray();
 
     res.status(200).json(joinedEvents);
