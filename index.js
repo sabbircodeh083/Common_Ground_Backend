@@ -334,9 +334,9 @@ app.post("/joinedEvent", async (req, res) => {
 });
 
 //get joined events for a participant
-app.post("/joinedEvent/list", async (req, res) => {
+app.post("/joinedEvent/list/:participantId", async (req, res) => {
   try {
-    const { participantId } = req.body;
+    const { participantId } = req.params;
 
     if (!participantId) {
       return res.status(400).json({
@@ -398,7 +398,7 @@ app.delete("/joinedEvent/:id", async (req, res) => {
 });
 
 //get organized events for a organizer
-app.get("/joinedEvent/list/:organizerId", async (req, res) => {
+app.get("/organizedEvent/list/:organizerId", async (req, res) => {
   try {
     const { organizerId } = req.params;
 
