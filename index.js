@@ -294,16 +294,8 @@ app.post("/joinedEvent", async (req, res) => {
     }
 
     // 5. Insert participant information, releasing the reserved slot on failure
-    const newJoinedEvent = {
-      eventId,
-      participantId,
-      participantName,
-      participantEmail,
-      joinedAt: new Date(),
-    };
-
     try {
-      await joinedEventCollection.insertOne(newJoinedEvent);
+      await joinedEventCollection.insertOne(req.body);
     } catch (error) {
       await eventCollection.updateOne(
         { _id: eventId },
@@ -334,7 +326,7 @@ app.post("/joinedEvent", async (req, res) => {
 });
 
 //get joined events for a participant
-app.post("/joinedEvent/list/:participantId", async (req, res) => {
+app.get("/joinedEvent/list/:participantId", async (req, res) => {
   try {
     const { participantId } = req.params;
 
