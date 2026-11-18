@@ -358,6 +358,45 @@ app.post("/joinedEvent/list", async (req, res) => {
   }
 });
 
+//leave a joined event (removes the participant's join row, not the event)
+app.delete("/joinedEvent/:id", async (req, res) => {
+  try {
+    const Id = req.params.id;
+
+    if (!ObjectId.isValid(Id)) {
+      return res.status(400).json({
+        message: "Invalid event id.",
+      });
+    }
+
+    const result = await joinedEventCollection.findOneAndDelete({
+      _id: new ObjectId(Id),
+    });
+
+    if (result) {
+      const { eventId } = result;
+      // Give the reserved volunteer slot back, but never below zero.
+      await eventCollection.updateOne(
+        { _id: new ObjectId(eventId), volunteerCount: { $gt: 0 } },
+        { $inc: { volunteerCount: -1 } },
+      );
+    } else {
+      return res.status(404).json({
+        message: "Event not found or already deleted.",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Left event successfully.",
+    });
+  } catch (err) {
+    console.log("error for leaving event", err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
