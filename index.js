@@ -2,12 +2,43 @@ import express from "express";
 import { MongoClient, ObjectId } from "mongodb";
 import cors from "cors";
 import "dotenv/config";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const CLIENT_URL = process.env.CLIENT_URL?.trim().replace(/\/+$/, "");
+
+if (!CLIENT_URL) {
+  throw new Error("CLIENT_URL is not configured");
+}
 
 const PORT = process.env.PORT || 8000;
 const app = express();
 
 //cros config. todo use frontend url in {origin: "frontend url"}
-app.use(cors());
+app.use(cors({ origin: CLIENT_URL }));
+
+//config jwks token
+const JWKS = createRemoteJWKSet(new URL(`${CLIENT_URL}/api/auth/jwks`));
+
+//check jwttoken
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).send({ msg: "Unauthorized!" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+
+    req.user = payload;
+    console.log(payload);
+    next();
+  } catch {
+    return res.status(401).send({ msg: "Unauthorized!" });
+  }
+};
 
 // Middleware
 app.use(express.json());
@@ -51,7 +82,7 @@ app.get("/", (req, res) => {
 });
 
 // Add a new event
-app.post("/events", async (req, res) => {
+app.post("/events", verifyToken, async (req, res) => {
   try {
     const newEvent = { ...req.body, volunteerCount: 0 };
     const result = await eventCollection.insertOne(newEvent);
@@ -143,7 +174,7 @@ app.get("/events/:id", async (req, res) => {
 });
 
 //update a event
-app.put("/events/:id", async (req, res) => {
+app.put("/events/:id", verifyToken, async (req, res) => {
   try {
     const Id = req.params.id;
 
@@ -190,7 +221,7 @@ app.put("/events/:id", async (req, res) => {
 });
 
 //delete a event
-app.delete("/events/:id", async (req, res) => {
+app.delete("/events/:id", verifyToken, async (req, res) => {
   try {
     const Id = req.params.id;
 
@@ -219,7 +250,7 @@ app.delete("/events/:id", async (req, res) => {
 });
 
 //add a joined to a event
-app.post("/joinedEvent", async (req, res) => {
+app.post("/joinedEvent", verifyToken, async (req, res) => {
   try {
     const {
       eventId: id,
@@ -328,7 +359,7 @@ app.post("/joinedEvent", async (req, res) => {
 });
 
 //get joined events for a participant
-app.get("/joinedEvent/list/:participantId", async (req, res) => {
+app.get("/joinedEvent/list/:participantId", verifyToken, async (req, res) => {
   try {
     const { participantId } = req.params;
 
@@ -354,7 +385,7 @@ app.get("/joinedEvent/list/:participantId", async (req, res) => {
 });
 
 //leave a joined event (removes the participant's join row, not the event)
-app.delete("/joinedEvent/:id", async (req, res) => {
+app.delete("/joinedEvent/:id", verifyToken, async (req, res) => {
   try {
     const Id = req.params.id;
 
@@ -393,7 +424,7 @@ app.delete("/joinedEvent/:id", async (req, res) => {
 });
 
 //get organized events for a organizer
-app.get("/organizedEvent/list/:organizerId", async (req, res) => {
+app.get("/organizedEvent/list/:organizerId", verifyToken, async (req, res) => {
   try {
     const { organizerId } = req.params;
 
